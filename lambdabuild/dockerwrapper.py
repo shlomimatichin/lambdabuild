@@ -11,11 +11,9 @@ def build(context_dir):
             return reader.read().split(":")[1]
 
 
-def extract_file_from_image(image, source, target):
+def extract_file_from_image(image, source):
     container_id = subprocess.check_output(['docker', 'create', image]).decode().strip()
     try:
-        contents = subprocess.check_output(['docker', 'cp', container_id + ":" + source, '-'])
+        return subprocess.check_output(['docker', 'cp', container_id + ":" + source, '-'])
     finally:
         subprocess.call(['docker', 'rm', '-v', container_id])
-    with open(target, "wb") as writer:
-        writer.write(contents)

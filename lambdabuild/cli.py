@@ -8,6 +8,7 @@ import argcomplete
 from lambdabuild import dockerwrapper
 from lambdabuild import dockerfiletemplates
 from lambdabuild import runtimeinfo
+from lambdabuild import byteequivalentzip
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--runtime", default="3.6")
@@ -55,7 +56,9 @@ elif args.cmd == "layer":
             runtimeinfo.RUNTIMES[args.runtime],
             requirements=requirements))
     image_id = dockerwrapper.build(build_dir)
-    dockerwrapper.extract_file_from_image(image_id, "/layer.zip", args.output_zip)
+    output_tar = dockerwrapper.extract_file_from_image(image_id, "/layer.tar")
+    layer_tar = byteequivalentzip.extract_tar_member(output_tar, "layer.tar")
+    byteequivalentzip.unpack_tar_to_zipfile(layer_tar, args.output_zip)
 else:
     raise AssertionError("Unknown command: %s" % args.cmd)
 

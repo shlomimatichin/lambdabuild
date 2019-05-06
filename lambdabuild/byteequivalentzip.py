@@ -17,6 +17,7 @@ def createzip(zipfile_path):
                 assert len(PYC_UNIX_TIMESTAMP) == 4
                 contents = contents[:4] + PYC_UNIX_TIMESTAMP + contents[8:]
             info = zipfile.ZipInfo(filename=name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.external_attr |= (0x1a4 << 16)
             zipper.writestr(info, contents, compress_type=zipfile.ZIP_DEFLATED)
         yield _add_to_zip
     os.rename(zipfile_path + ".tmp", zipfile_path)

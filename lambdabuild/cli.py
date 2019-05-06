@@ -4,11 +4,14 @@
 import argparse
 import os
 import shutil
+import distutils.dir_util
+import re
 import argcomplete
 from lambdabuild import dockerwrapper
 from lambdabuild import dockerfiletemplates
 from lambdabuild import runtimeinfo
 from lambdabuild import byteequivalentzip
+from lambdabuild import untar
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--runtime", default="3.6")
@@ -25,6 +28,19 @@ artifact_cmd = subparsers.add_parser(
     "artifact",
     help="compile your code into an artifact")
 artifact_cmd.add_argument("--output-zip", required=True)
+artifact_cmd.add_argument(
+    "--entry-points",
+    required=True,
+    nargs="+",
+    help="path to python scripts to find minimal modules set from. specify an empty argument to disable this feature")
+artifact_cmd.add_argument(
+    "--source-code",
+    required=True,
+    nargs="+",
+    help="each argument is a directory to copy to the task root")
+artifact_cmd.add_argument("--exclude-dirs", nargs="+", default=[])
+artifact_cmd.add_argument("--exclude-basenames", nargs="+", default=[])
+artifact_cmd.add_argument("--exclude-regexes", nargs="+", default=['test'])
 layer_cmd = subparsers.add_parser(
     "layer",
     help="build layer from python dependencies")
@@ -32,33 +48,69 @@ layer_cmd.add_argument("--output-zip", required=True)
 input_group = layer_cmd.add_mutually_exclusive_group(required=True)
 input_group.add_argument("--requirements")
 input_group.add_argument("--requirements-file")
-layer_cmd.add_argument("--build-dir")
 
 argcomplete.autocomplete(parser)
 args = parser.parse_args()
 
-if args.cmd == "artifact":
-    pass
-elif args.cmd == "layer":
-    build_dir = args.build_dir or args.output_zip + ".build"
+
+def create_build_dir():
+    build_dir = args.output_zip + ".build"
     if os.path.isdir(build_dir):
         shutil.rmtree(build_dir)
     os.makedirs(build_dir)
+    shutil.copy(os.path.join(os.path.dirname(__file__), "clean_lambda_directory_before_zip_python2.py"), build_dir)
+    shutil.copy(os.path.join(os.path.dirname(__file__), "clean_lambda_directory_before_zip_python3.py"), build_dir)
+    return build_dir
+
+
+if args.cmd == "artifact":
+    build_dir = create_build_dir()
+    source_code_dir = os.path.join(build_dir, "sourcecode")
+    for source in args.source_code:
+        print
+        distutils.dir_util.copy_tree(source, source_code_dir, preserve_symlinks=1)
+    regexes = [re.compile(r) for r in args.exclude_regexes]
+    for root, dirs, files in os.walk(build_dir):
+        for dirname in args.exclude_dirs:
+            if dirname in dirs:
+                dirs.remove(dirname)
+                shutil.rmtree(os.path.join(root, dirname))
+        for basename in args.exclude_basenames:
+            if basename in files:
+                files.remove(basename)
+                os.unlink(os.patj.join(root, basename))
+        for basename in files:
+            fullpath = os.path.join(root, basename)
+            for regex in regexes:
+                if regex.search(fullpath):
+                    os.unlink(fullpath)
+                    break
+    entry_points = ""
+    if args.entry_points != [""]:
+        entry_points = "--entry-points " + " ".join(args.entry_points)
+    with open(f"{build_dir}/Dockerfile", "w") as writer:
+        writer.write(dockerfiletemplates.BUILD_ARTIFACT % dict(
+            runtimeinfo.RUNTIMES[args.runtime],
+            entry_points=entry_points))
+    artifact_tar = dockerwrapper.build_and_extract_file(build_dir, "/artifact.tar")
+    with byteequivalentzip.createzip(args.output_zip) as add_to_zip:
+        for name, contents in untar.unpack_in_memory_tar(artifact_tar):
+            add_to_zip(name, contents)
+elif args.cmd == "layer":
+    build_dir = create_build_dir()
     if args.requirements:
         requirements = args.requirements
     else:
         with open(args.requirements_file) as reader:
             requirements = reader.read().replace("\n", " ")
-    shutil.copy(os.path.join(os.path.dirname(__file__), "clean_lambda_directory_before_zip_python2.py"), build_dir)
-    shutil.copy(os.path.join(os.path.dirname(__file__), "clean_lambda_directory_before_zip_python3.py"), build_dir)
     with open(f"{build_dir}/Dockerfile", "w") as writer:
         writer.write(dockerfiletemplates.BUILD_LAYER % dict(
             runtimeinfo.RUNTIMES[args.runtime],
             requirements=requirements))
-    image_id = dockerwrapper.build(build_dir)
-    output_tar = dockerwrapper.extract_file_from_image(image_id, "/layer.tar")
-    layer_tar = byteequivalentzip.extract_tar_member(output_tar, "layer.tar")
-    byteequivalentzip.unpack_tar_to_zipfile(layer_tar, args.output_zip)
+    layer_tar = dockerwrapper.build_and_extract_file(build_dir, "/layer.tar")
+    with byteequivalentzip.createzip(args.output_zip) as add_to_zip:
+        for name, contents in untar.unpack_in_memory_tar(layer_tar):
+            add_to_zip(name, contents)
 else:
     raise AssertionError("Unknown command: %s" % args.cmd)
 

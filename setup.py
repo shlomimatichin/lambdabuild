@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="lambdabuild",
-    version="0.0.2",
+    version="0.0.3",
     author="Shlomi Matichin",
     author_email="shlomomatichin@gmail.com",
     description="Easily build AWS lambda artifacts and layers, correctly",

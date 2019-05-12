@@ -50,7 +50,7 @@ EXTENSIONS_TO_DELETE = [
     ".swn",
     ".swm",
 ]
-DIRETORIES_EXTENSIONS_TO_DELETE = [".dist-info", ".egg-info", ".js", "test", "tests"]
+DIRECTORIES_EXTENSIONS_TO_DELETE = [".dist-info", ".egg-info", ".js"]
 NEVER_DELETE = []
 
 assert sys.version_info.major == 3
@@ -78,7 +78,7 @@ for root, dirs, files in os.walk(args.dir):
             if os.path.abspath(full_path) not in py_files_to_keep:
                 os.unlink(full_path)
     for dirname in list(dirs):
-        for extension in DIRETORIES_EXTENSIONS_TO_DELETE:
+        for extension in DIRECTORIES_EXTENSIONS_TO_DELETE:
             if dirname.endswith(extension):
                 shutil.rmtree(os.path.join(root, dirname))
                 dirs.remove(dirname)

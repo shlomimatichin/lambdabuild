@@ -4,7 +4,6 @@
 import argparse
 import os
 import shutil
-import distutils.dir_util
 import re
 import argcomplete
 from lambdabuild import dockerwrapper
@@ -12,6 +11,7 @@ from lambdabuild import dockerfiletemplates
 from lambdabuild import runtimeinfo
 from lambdabuild import byteequivalentzip
 from lambdabuild import untar
+from lambdabuild import collectsources
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--runtime", default="3.6")
@@ -32,15 +32,39 @@ artifact_cmd.add_argument(
     "--entry-points",
     required=True,
     nargs="+",
-    help="path to python scripts to find minimal modules set from. specify an empty argument to disable this feature")
+    help="absolute python module path to find minimal modules set from. "
+    "specify an empty argument to disable this feature")
 artifact_cmd.add_argument(
-    "--source-code",
-    required=True,
-    nargs="+",
-    help="each argument is a directory to copy to the task root")
+    "--source-code-root-dirs", default=[], nargs="+",
+    help="each argument is a directory to copy whole contents to the task root")
+artifact_cmd.add_argument(
+    "--source-code-dirs", default=[], nargs="+",
+    help="each argument is a directory to copy to the task root, keeping the basename")
+artifact_cmd.add_argument(
+    "--source-code-relative", default=[], nargs="+",
+    help="each argument is a colon separated pair: <directory to copy relativly from>:<target in artifact>")
+artifact_cmd.add_argument(
+    "--source-code-renamed", default=[], nargs="+",
+    help="each argument is a colon separated pair: <source file or directory to copy>:<target in artifact>")
+artifact_cmd.add_argument(
+    "--raw-files-root-dirs", default=[], nargs="+",
+    help="each argument is a directory to copy whole contents to the task root "
+    "(files are not removed by entry-point optimization)")
+artifact_cmd.add_argument(
+    "--raw-files-dirs", default=[], nargs="+",
+    help="each argument is a directory to copy to the task root, keeping the basename "
+    "(files are not removed by entry-point optimization)")
+artifact_cmd.add_argument(
+    "--raw-files-relative", default=[], nargs="+",
+    help="each argument is a colon separated pair: <directory to copy relativly from>:<target in artifact>"
+    "(files are not removed by entry-point optimization)")
+artifact_cmd.add_argument(
+    "--raw-files-renamed", default=[], nargs="+",
+    help="each argument is a colon separated pair: <source file or directory to copy>:<target in artifact> "
+    "(files are not removed by entry-point optimization)")
 artifact_cmd.add_argument("--exclude-dirs", nargs="+", default=[])
-artifact_cmd.add_argument("--exclude-basenames", nargs="+", default=[])
-artifact_cmd.add_argument("--exclude-regexes", nargs="+", default=['test'])
+artifact_cmd.add_argument("--exclude-basenames", nargs="+", default=[".gitignore"])
+artifact_cmd.add_argument("--exclude-regexes", nargs="+", default=[])
 layer_cmd = subparsers.add_parser(
     "layer",
     help="build layer from python dependencies")
@@ -65,10 +89,16 @@ def create_build_dir():
 
 if args.cmd == "artifact":
     build_dir = create_build_dir()
-    source_code_dir = os.path.join(build_dir, "sourcecode")
-    for source in args.source_code:
-        print
-        distutils.dir_util.copy_tree(source, source_code_dir, preserve_symlinks=1)
+    collectsources.collect_sources(destination=os.path.join(build_dir, "sourcecode"),
+                                   root_dirs=args.source_code_root_dirs,
+                                   dirs=args.source_code_dirs,
+                                   relative=args.source_code_relative,
+                                   renamed=args.source_code_renamed)
+    collectsources.collect_sources(destination=os.path.join(build_dir, "rawfiles"),
+                                   root_dirs=args.raw_files_root_dirs,
+                                   dirs=args.raw_files_dirs,
+                                   relative=args.raw_files_relative,
+                                   renamed=args.raw_files_renamed)
     regexes = [re.compile(r) for r in args.exclude_regexes]
     for root, dirs, files in os.walk(build_dir):
         for dirname in args.exclude_dirs:
@@ -78,7 +108,7 @@ if args.cmd == "artifact":
         for basename in args.exclude_basenames:
             if basename in files:
                 files.remove(basename)
-                os.unlink(os.patj.join(root, basename))
+                os.unlink(os.path.join(root, basename))
         for basename in files:
             fullpath = os.path.join(root, basename)
             for regex in regexes:

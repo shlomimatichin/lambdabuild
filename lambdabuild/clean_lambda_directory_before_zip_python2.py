@@ -42,7 +42,7 @@ EXTENSIONS_TO_DELETE = [
     ".tgz",
     ".woff",
 ]
-DIRETORIES_EXTENSIONS_TO_DELETE = [".dist-info", "__pycache__", ".egg-info", ".js", "test"]
+DIRECTORIES_EXTENSIONS_TO_DELETE = [".dist-info", "__pycache__", ".egg-info", ".js"]
 
 assert sys.version_info.major == 2
 
@@ -63,7 +63,7 @@ for root, dirs, files in os.walk(args.dir):
             if args.sourceless:
                 os.unlink(full_path)
     for dirname in list(dirs):
-        for extension in DIRETORIES_EXTENSIONS_TO_DELETE:
+        for extension in DIRECTORIES_EXTENSIONS_TO_DELETE:
             if dirname.endswith(extension):
                 shutil.rmtree(os.path.join(root, dirname))
                 dirs.remove(dirname)

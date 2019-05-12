@@ -20,6 +20,8 @@ WORKDIR /lambdabuild
 COPY clean_lambda_directory_before_zip_python%(two_or_three)s.py /
 COPY sourcecode/ /lambdabuild/
 RUN python%(three)s /clean_lambda_directory_before_zip_python%(two_or_three)s.py . %(entry_points)s
+COPY rawfiles/ /lambdabuild/
+RUN python%(three)s /clean_lambda_directory_before_zip_python%(two_or_three)s.py .
 RUN find -name '*.so*' | xargs -I @ strip @
 RUN tar -cf /artifact.tar *
 CMD /bin/bash

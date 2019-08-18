@@ -23,55 +23,66 @@ parser.add_argument(
         "lambci/lambda:build-python2.7",
         "amazonlinux:2017.03",
     ])
+parser.add_argument("--output-zip", required=True)
+parser.add_argument(
+    "--source-code-root-dirs", default=[], nargs="+",
+    help="each argument is a directory to copy whole contents to the task root")
+parser.add_argument(
+    "--source-code-dirs", default=[], nargs="+",
+    help="each argument is a directory to copy to the task root, keeping the basename")
+parser.add_argument(
+    "--source-code-relative", default=[], nargs="+",
+    help="each argument is a colon separated pair: <directory to copy relativly from>:<target in artifact>")
+parser.add_argument(
+    "--source-code-renamed", default=[], nargs="+",
+    help="each argument is a colon separated pair: <source file or directory to copy>:<target in artifact>")
+parser.add_argument(
+    "--raw-files-root-dirs", default=[], nargs="+",
+    help="each argument is a directory to copy whole contents to the task root "
+    "(files are not removed by entry-point optimization)")
+parser.add_argument(
+    "--raw-files-dirs", default=[], nargs="+",
+    help="each argument is a directory to copy to the task root, keeping the basename "
+    "(files are not removed by entry-point optimization)")
+parser.add_argument(
+    "--raw-files-relative", default=[], nargs="+",
+    help="each argument is a colon separated pair: <directory to copy relativly from>:<target in artifact>"
+    "(files are not removed by entry-point optimization)")
+parser.add_argument(
+    "--raw-files-renamed", default=[], nargs="+",
+    help="each argument is a colon separated pair: <source file or directory to copy>:<target in artifact> "
+    "(files are not removed by entry-point optimization)")
+parser.add_argument("--exclude-dirs", nargs="+", default=["tests", "test"],
+                    help="directory basenames to exclude from docker build context")
+parser.add_argument("--exclude-basenames", nargs="+", default=[".gitignore", "tags"],
+                    help="file basenames to exclude from docker build context")
+parser.add_argument("--exclude-regexes", nargs="+", default=[],
+                    help="full path regexes to exclude from docker build context")
+
 subparsers = parser.add_subparsers(dest="cmd")
 artifact_cmd = subparsers.add_parser(
     "artifact",
     help="compile your code into an artifact")
-artifact_cmd.add_argument("--output-zip", required=True)
 artifact_cmd.add_argument(
     "--entry-points",
     required=True,
     nargs="+",
     help="absolute python module path to find minimal modules set from. "
     "specify an empty argument to disable this feature")
-artifact_cmd.add_argument(
-    "--source-code-root-dirs", default=[], nargs="+",
-    help="each argument is a directory to copy whole contents to the task root")
-artifact_cmd.add_argument(
-    "--source-code-dirs", default=[], nargs="+",
-    help="each argument is a directory to copy to the task root, keeping the basename")
-artifact_cmd.add_argument(
-    "--source-code-relative", default=[], nargs="+",
-    help="each argument is a colon separated pair: <directory to copy relativly from>:<target in artifact>")
-artifact_cmd.add_argument(
-    "--source-code-renamed", default=[], nargs="+",
-    help="each argument is a colon separated pair: <source file or directory to copy>:<target in artifact>")
-artifact_cmd.add_argument(
-    "--raw-files-root-dirs", default=[], nargs="+",
-    help="each argument is a directory to copy whole contents to the task root "
-    "(files are not removed by entry-point optimization)")
-artifact_cmd.add_argument(
-    "--raw-files-dirs", default=[], nargs="+",
-    help="each argument is a directory to copy to the task root, keeping the basename "
-    "(files are not removed by entry-point optimization)")
-artifact_cmd.add_argument(
-    "--raw-files-relative", default=[], nargs="+",
-    help="each argument is a colon separated pair: <directory to copy relativly from>:<target in artifact>"
-    "(files are not removed by entry-point optimization)")
-artifact_cmd.add_argument(
-    "--raw-files-renamed", default=[], nargs="+",
-    help="each argument is a colon separated pair: <source file or directory to copy>:<target in artifact> "
-    "(files are not removed by entry-point optimization)")
-artifact_cmd.add_argument("--exclude-dirs", nargs="+", default=[])
-artifact_cmd.add_argument("--exclude-basenames", nargs="+", default=[".gitignore"])
-artifact_cmd.add_argument("--exclude-regexes", nargs="+", default=[])
+
 layer_cmd = subparsers.add_parser(
     "layer",
     help="build layer from python dependencies")
-layer_cmd.add_argument("--output-zip", required=True)
 input_group = layer_cmd.add_mutually_exclusive_group(required=True)
-input_group.add_argument("--requirements")
-input_group.add_argument("--requirements-file")
+input_group.add_argument("--requirements", help="requirements in command line")
+input_group.add_argument("--requirements-file", help="requirements.txt file")
+layer_cmd.add_argument("--keep-sources", action="store_true", help="keep .py files")
+
+custom_cmd = subparsers.add_parser(
+    "custom",
+    help="build byte equivilent zip from a tar created by a dockerfile. make "
+    "sure to put file in /custom.tar in provided dockerfile.")
+custom_cmd.add_argument("--dockerfile", required=True)
 
 argcomplete.autocomplete(parser)
 args = parser.parse_args()
@@ -87,18 +98,7 @@ def create_build_dir():
     return build_dir
 
 
-if args.cmd == "artifact":
-    build_dir = create_build_dir()
-    collectsources.collect_sources(destination=os.path.join(build_dir, "sourcecode"),
-                                   root_dirs=args.source_code_root_dirs,
-                                   dirs=args.source_code_dirs,
-                                   relative=args.source_code_relative,
-                                   renamed=args.source_code_renamed)
-    collectsources.collect_sources(destination=os.path.join(build_dir, "rawfiles"),
-                                   root_dirs=args.raw_files_root_dirs,
-                                   dirs=args.raw_files_dirs,
-                                   relative=args.raw_files_relative,
-                                   renamed=args.raw_files_renamed)
+def delete_excluded_files(build_dir):
     regexes = [re.compile(r) for r in args.exclude_regexes]
     for root, dirs, files in os.walk(build_dir):
         for dirname in args.exclude_dirs:
@@ -115,6 +115,29 @@ if args.cmd == "artifact":
                 if regex.search(fullpath):
                     os.unlink(fullpath)
                     break
+
+
+def build_and_zip(build_dir, tar_filename):
+    output_tar = dockerwrapper.build_and_extract_file(build_dir, tar_filename)
+    with byteequivalentzip.createzip(args.output_zip) as add_to_zip:
+        for name, contents in untar.unpack_in_memory_tar(output_tar):
+            add_to_zip(name, contents)
+
+
+build_dir = create_build_dir()
+collectsources.collect_sources(destination=os.path.join(build_dir, "sourcecode"),
+                               root_dirs=args.source_code_root_dirs,
+                               dirs=args.source_code_dirs,
+                               relative=args.source_code_relative,
+                               renamed=args.source_code_renamed)
+collectsources.collect_sources(destination=os.path.join(build_dir, "rawfiles"),
+                               root_dirs=args.raw_files_root_dirs,
+                               dirs=args.raw_files_dirs,
+                               relative=args.raw_files_relative,
+                               renamed=args.raw_files_renamed)
+delete_excluded_files(build_dir)
+
+if args.cmd == "artifact":
     entry_points = ""
     if args.entry_points != [""]:
         entry_points = "--entry-points " + " ".join(args.entry_points)
@@ -122,25 +145,23 @@ if args.cmd == "artifact":
         writer.write(dockerfiletemplates.BUILD_ARTIFACT % dict(
             runtimeinfo.RUNTIMES[args.runtime],
             entry_points=entry_points))
-    artifact_tar = dockerwrapper.build_and_extract_file(build_dir, "/artifact.tar")
-    with byteequivalentzip.createzip(args.output_zip) as add_to_zip:
-        for name, contents in untar.unpack_in_memory_tar(artifact_tar):
-            add_to_zip(name, contents)
+    build_and_zip(build_dir, "/artifact.tar")
 elif args.cmd == "layer":
-    build_dir = create_build_dir()
-    if args.requirements:
+    if args.requirements is not None:
         requirements = args.requirements
     else:
         with open(args.requirements_file) as reader:
             requirements = reader.read().replace("\n", " ")
+    sourceless = not args.keep_sources
     with open(f"{build_dir}/Dockerfile", "w") as writer:
         writer.write(dockerfiletemplates.BUILD_LAYER % dict(
             runtimeinfo.RUNTIMES[args.runtime],
-            requirements=requirements))
-    layer_tar = dockerwrapper.build_and_extract_file(build_dir, "/layer.tar")
-    with byteequivalentzip.createzip(args.output_zip) as add_to_zip:
-        for name, contents in untar.unpack_in_memory_tar(layer_tar):
-            add_to_zip(name, contents)
+            requirements=requirements,
+            sourceless="--sourceless" if sourceless else ""))
+    build_and_zip(build_dir, "/layer.tar")
+elif args.cmd == "custom":
+    shutil.copy(args.dockerfile, f"{build_dir}/Dockerfile")
+    build_and_zip(build_dir, "/custom.tar")
 else:
     raise AssertionError("Unknown command: %s" % args.cmd)
 

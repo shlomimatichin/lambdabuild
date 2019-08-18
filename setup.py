@@ -5,11 +5,12 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="lambdabuild",
-    version="0.1.0",
+    version="0.2.0",
     author="Shlomi Matichin",
     author_email="shlomomatichin@gmail.com",
     description="Easily build AWS lambda artifacts and layers, correctly",
     long_description=long_description,
+    long_description_content_type="text/markdown",
     url="https://github.com/shlomimatichin/lambdabuild",
     packages=setuptools.find_packages(),
     classifiers=[

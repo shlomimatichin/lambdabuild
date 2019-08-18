@@ -9,7 +9,7 @@ PYC_TIMESTAMP = datetime.date(1981, 1, 1)
 PYC_UNIX_TIMESTAMP = struct.pack("I", int(time.mktime(PYC_TIMESTAMP.timetuple())))
 PYTHON36_HEADER = b"\x33\x0d\x0d\x0a"
 PYTHON37_HEADER = b"\x42\x0d\x0d\x0a"
-PYTHON27_HEADER = b"\xf3\x03\x0d\x0d"
+PYTHON27_HEADER = b"\x03\xf3\x0d\x0a"
 
 
 @contextlib.contextmanager

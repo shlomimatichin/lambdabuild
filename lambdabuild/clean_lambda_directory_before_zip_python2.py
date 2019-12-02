@@ -43,6 +43,7 @@ EXTENSIONS_TO_DELETE = [
     ".tex",
     ".tgz",
     ".woff",
+    ".woff2",
     ".swp",
     ".swo",
     ".swn",

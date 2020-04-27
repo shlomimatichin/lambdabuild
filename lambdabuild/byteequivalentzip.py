@@ -14,8 +14,14 @@ PYTHON27_HEADER = b"\x03\xf3\x0d\x0a"
 
 @contextlib.contextmanager
 def createzip(zipfile_path):
+    context = dict(lastName=None)
     with zipfile.ZipFile(zipfile_path + ".tmp", "w", compression=zipfile.ZIP_DEFLATED) as zipper:
         def _add_to_zip(name, contents):
+            if context['lastName'] is not None:
+                assert name > context['lastName'], \
+                    "Input filename must be alphabetically sorted to assure byte equivalancy: %s <= %s" % (
+                        name, context['lastName'])
+            context['lastName'] = name
             if name.endswith(".pyc"):
                 assert len(PYC_UNIX_TIMESTAMP) == 4
                 if contents.startswith(PYTHON37_HEADER):

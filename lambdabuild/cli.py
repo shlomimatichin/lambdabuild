@@ -120,7 +120,7 @@ def delete_excluded_files(build_dir):
 def build_and_zip(build_dir, tar_filename):
     output_tar = dockerwrapper.build_and_extract_file(build_dir, tar_filename)
     with byteequivalentzip.createzip(args.output_zip) as add_to_zip:
-        for name, contents in untar.unpack_in_memory_tar(output_tar):
+        for name, contents in untar.unpack_in_memory_tar(output_tar, sort=True):
             add_to_zip(name, contents)
 
 

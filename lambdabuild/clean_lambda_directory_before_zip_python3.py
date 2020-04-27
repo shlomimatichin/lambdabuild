@@ -28,7 +28,7 @@ EXTENSIONS_TO_DELETE = [
     ".html",
     ".ico",
     ".java",
-    ".js",
+    ".js.map",
     ".jsx",
     ".make",
     ".md",

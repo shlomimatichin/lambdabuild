@@ -18,6 +18,8 @@ parser.add_argument("--runtime", default="3.6")
 parser.add_argument(
     "--base-docker",
     choices=[
+        "lambci/lambda:build-python3.8",
+        "lambci/lambda:build-python3.7",
         "lambci/lambda:build-python3.6",
         "lambci/lambda:build-python3.7",
         "lambci/lambda:build-python2.7",

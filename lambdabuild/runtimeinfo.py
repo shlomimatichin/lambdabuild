@@ -14,9 +14,16 @@ RUNTIMES = {
         two_or_three="3",
         three="3",
     ),
+    '3.8': dict(
+        base_image="lambci/lambda:build-python3.8",
+        two_or_three="3",
+        three="3",
+    ),
 }
 
 BASE_IMAGES = [
+    "lambci/lambda:build-python3.8",
+    "lambci/lambda:build-python3.7",
     "lambci/lambda:build-python3.6",
     "lambci/lambda:build-python3.7",
     "lambci/lambda:build-python2.7",

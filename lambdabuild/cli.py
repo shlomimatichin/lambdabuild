@@ -107,7 +107,7 @@ def delete_excluded_files(build_dir):
             if dirname in dirs:
                 dirs.remove(dirname)
                 shutil.rmtree(os.path.join(root, dirname))
-        for basename in args.exclude_basenames:
+        for basename in args.exclude_basenames + ['__pycache__']:
             if basename in files:
                 files.remove(basename)
                 os.unlink(os.path.join(root, basename))

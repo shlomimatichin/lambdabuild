@@ -65,8 +65,11 @@ if args.entry_points:
             writer.write(f"import {entry_point}\n")
         module_finder.run_script("/tmp/entrypoint.py")
     for module in module_finder.modules.values():
-        if module.__file__ is not None and module.__file__.startswith(args.dir):
-            py_files_to_keep.add(os.path.abspath(module.__file__))
+        if not module.__file__:
+            continue
+        file_path = os.path.abspath(module.__file__)
+        if file_path.startswith(os.path.abspath(args.dir)):
+            py_files_to_keep.add(file_path)
 
 never_delete = set(os.path.join(args.dir, p) for p in NEVER_DELETE)
 for root, dirs, files in os.walk(args.dir):

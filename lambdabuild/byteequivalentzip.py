@@ -10,6 +10,7 @@ PYC_UNIX_TIMESTAMP = struct.pack("I", int(time.mktime(PYC_TIMESTAMP.timetuple())
 PYTHON36_HEADER = b"\x33\x0d\x0d\x0a"
 PYTHON37_HEADER = b"\x42\x0d\x0d\x0a"
 PYTHON38_HEADER = b"\x55\x0d\x0d\x0a"
+PYTHON39_HEADER = b"\x61\x0d\x0d\x0a"
 PYTHON27_HEADER = b"\x03\xf3\x0d\x0a"
 
 
@@ -25,7 +26,7 @@ def createzip(zipfile_path):
             context['lastName'] = name
             if name.endswith(".pyc"):
                 assert len(PYC_UNIX_TIMESTAMP) == 4
-                if contents.startswith(PYTHON37_HEADER) or contents.startswith(PYTHON38_HEADER):
+                if contents.startswith(PYTHON37_HEADER) or contents.startswith(PYTHON38_HEADER) or contents.startswith(PYTHON39_HEADER):
                     contents = contents[:8] + PYC_UNIX_TIMESTAMP + contents[12:]
                 else:
                     assert contents.startswith(PYTHON27_HEADER) or contents.startswith(PYTHON36_HEADER), \

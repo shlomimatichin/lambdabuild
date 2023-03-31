@@ -104,11 +104,11 @@ def create_build_dir():
 def delete_excluded_files(build_dir):
     regexes = [re.compile(r) for r in args.exclude_regexes]
     for root, dirs, files in os.walk(build_dir):
-        for dirname in args.exclude_dirs:
+        for dirname in args.exclude_dirs + ['__pycache__']:
             if dirname in dirs:
                 dirs.remove(dirname)
                 shutil.rmtree(os.path.join(root, dirname))
-        for basename in args.exclude_basenames + ['__pycache__']:
+        for basename in args.exclude_basenames:
             if basename in files:
                 files.remove(basename)
                 os.unlink(os.path.join(root, basename))

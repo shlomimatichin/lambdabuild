@@ -21,6 +21,7 @@ RUN mkdir /lambdabuild
 WORKDIR /lambdabuild
 COPY clean_lambda_directory_before_zip_python%(two_or_three)s.py /
 COPY sourcecode/ /lambdabuild/
+RUN find /lambdabuild/ -name '__pycache__' | xargs rm -rf
 RUN python%(three)s /clean_lambda_directory_before_zip_python%(two_or_three)s.py . %(entry_points)s
 COPY rawfiles/ /lambdabuild/
 RUN find -name '*.so*' | xargs -I @ strip @
